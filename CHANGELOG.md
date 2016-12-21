@@ -3,8 +3,10 @@
 ## NEXT
 
 - New function `Get-RemoteFiles`. See [documentation](https://github.com/majkinetor/au#embedding-binaries).
+- New function `New-AUPackage` which returns `[AUPackage]` given the path to the package directory.
 - `Update-Package`
   - Support newer TLS version support by setting the `SecurityProtocol` property of `ServicePointManager`.
+- Refactoring - most of the update functionality moved to `[AUPackage]` class so its easier to reuse it in different context.
 
 ### Bugfixes
 
