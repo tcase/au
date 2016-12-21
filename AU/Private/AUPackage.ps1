@@ -54,6 +54,11 @@ class AUPackage {
     }
 
     SetForced() {
+        if ($this.IsUpdated()) {
+            'Ignoring force as new remote version is available'
+            return
+        }
+
         $this.Forced = $true
 
         $date_format = 'yyyyMMdd'
@@ -72,6 +77,42 @@ class AUPackage {
     SaveNuspec(){
         $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
         [System.IO.File]::WriteAllText($this.NuspecPath, $this.NuspecXml.InnerXml, $Utf8NoBomEncoding)
+    }
+
+    GetLatest() {
+        $global:Latest = @{PackageName = $this.Name; NuspecVersion = $this.NuspecVersion }
+
+        if (![AUPackage]::IsVersion( $this.NuspecVersion )) {
+            Write-Warning "Invalid nuspec file Version '$($this.NuspecVersion)' - using 0.0"
+            $global:Latest.NuspecVersion = $this.NuspecVersion = '0.0'
+        }
+
+        try {
+            $res = au_GetLatest | select -Last 1
+            if ($res -eq $null) { throw 'au_GetLatest returned nothing' }
+
+            $res_type = $res.GetType()
+            if ($res_type -ne [HashTable]) { throw "au_GetLatest doesn't return a HashTable result but $res_type" }
+
+            $res.Keys | % { $global:Latest.Remove($_) }
+            $global:Latest += $res
+        } catch {
+            throw "au_GetLatest failed`n$_"
+        }
+
+        if (![AUPackage]::IsVersion($global:Latest.Version)) { throw "Invalid version: $($global:Latest.Version)" }
+        $this.RemoteVersion = $global:Latest.Version
+        $this.Name          = $global:Latest.PackageName
+    }
+
+    [bool]ExistsInGallery( [string] $Version ) {
+        $gallery_url = "https://chocolatey.org/packages/{0}/{1}" -f $this.Name, $Version
+        try {
+            request $gallery_url | out-null
+            return $true
+        } catch {}
+
+        return $false
     }
 
     UpdateFiles([bool]$DoMandatoryUpdates) {
@@ -116,5 +157,10 @@ class AUPackage {
 
         update_mandatory
         update_files
+    }
+
+    SetFileType() {
+        $match_url = ($global:Latest.Keys | ? { $_ -match '^URL*' } | select -First 1 | % { $global:Latest[$_] } | split-Path -Leaf) -match '(?<=\.)[^.]+$'
+        if ($match_url -and !$global:Latest.FileType) { $global:Latest.FileType = $Matches[0] }
     }
 }

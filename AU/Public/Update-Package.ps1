@@ -191,13 +191,14 @@ function Update-Package {
     }
 
     function result() {
-        if ($global:Silent) { return }
-
         $input | % {
             $package.Result += $_
             if (!$NoHostOutput) { Write-Host $_ }
         }
     }
+
+    [System.Net.ServicePointManager]::SecurityProtocol = 'Ssl3,Tls,Tls11,Tls12' #https://github.com/chocolatey/chocolatey-coreteampackages/issues/366
+    $module = $MyInvocation.MyCommand.ScriptBlock.Module
 
     if ($PSCmdlet.MyInvocation.ScriptName -eq '') {
         Write-Verbose 'Running outside of the script'
@@ -215,75 +216,47 @@ function Update-Package {
     }
 
     $package = New-AuPackage
+    "{0} - checking updates using {1} version {2}" -f $package.Name, $module.Name, $module.Version | result
+
     if ($Result) { sv -Scope Global -Name $Result -Value $package }
 
-    $global:Latest = @{PackageName = $package.Name; NuspecVersion = $package.NuspecVersion }
-    if (![AUPackage]::IsVersion( $package.NuspecVersion )) {
-        Write-Warning "Invalid nuspec file Version '$($package.NuspecVersion)' - using 0.0"
-        $global:Latest.NuspecVersion = $package.NuspecVersion = '0.0'
-    }
-
-    [System.Net.ServicePointManager]::SecurityProtocol = 'Ssl3,Tls,Tls11,Tls12' #https://github.com/chocolatey/chocolatey-coreteampackages/issues/366
-    $module = $MyInvocation.MyCommand.ScriptBlock.Module
-    "{0} - checking updates using {1} version {2}" -f $package.Name, $module.Name, $module.Version | result
-    try {
-        $res = au_GetLatest | select -Last 1
-        if ($res -eq $null) { throw 'au_GetLatest returned nothing' }
-
-        $res_type = $res.GetType()
-        if ($res_type -ne [HashTable]) { throw "au_GetLatest doesn't return a HashTable result but $res_type" }
-
-        $res.Keys | % { $global:Latest.Remove($_) }
-        $global:Latest += $res
-        if ($global:au_Force) { $Force = $true }
-    } catch {
-        throw "au_GetLatest failed`n$_"
-    }
-
-    if (![AUPackage]::IsVersion($Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
-    $package.RemoteVersion = $Latest.Version
-    $package.Name          = $Latest.PackageName
+    $package.GetLatest()
+    if ($global:au_Force) { $Force = $true }  #au_GetLatest can also force update
 
     if (!$NoCheckUrl) { check_urls }
 
     "nuspec version: " + $package.NuspecVersion | result
     "remote version: " + $package.RemoteVersion | result
+    if ($Force) { $package.SetForced() | result }
 
-    if ($package.IsUpdated()) {
-        if (!($NoCheckChocoVersion -or $Force)) {
-            $choco_url = "https://chocolatey.org/packages/{0}/{1}" -f $package.Name, $package.RemoteVersion
-            try {
-                request $choco_url $Timeout | out-null
-                "New version is available but it already exists in the Chocolatey community feed (disable using `$NoCheckChocoVersion`):`n  $choco_url" | result
-                return $package
-            } catch { }
-        }
-    } else {
-        if (!$Force) {
-            'No new version found' | result
-            return $package
-        }
-        else {
-            'No new version found, but update is forced' | result
-            $package.SetForced()
-            if ($global:au_Version) {
-                "Overriding version to: $global:au_Version" | result
-                $global:Latest.Version = $package.RemoteVersion = $global:au_Version
-                if (![AUPackage]::IsVersion($Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
-                $global:au_Version = $null
-            }
+    if (!$package.IsUpdated()) {
+        'No new version found' | result
+        return $package
+    }
+
+    if (!$NoCheckChocoVersion -and $package.ExistsInGallery( $global:Latest.Version )) {
+        "New version is available but it already exists in the Chocolatey community feed (disable using `$NoCheckChocoVersion`)." | result
+        return $package
+    }
+
+    # Update happens from this point
+    if ($package.Forced)  {
+        'No new version found, but update is forced' | result
+        if ($global:au_Version) {
+            "Overriding version to: $global:au_Version" | result
+            $global:Latest.Version = $package.RemoteVersion = $global:au_Version
+            if (![AUPackage]::IsVersion($Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
+            $global:au_Version = $null
         }
     }
 
     'New version is available' | result
 
-    $match_url = ($Latest.Keys | ? { $_ -match '^URL*' } | select -First 1 | % { $Latest[$_] } | split-Path -Leaf) -match '(?<=\.)[^.]+$'
-    if ($match_url -and !$Latest.FileType) { $Latest.FileType = $Matches[0] }
-
+    $package.SetFileType()
     if ($ChecksumFor -ne 'none') { get_checksum } else { 'Automatic checksum skipped' | result }
 
     # Update files
-    if (Test-Path Function:\au_BeforeUpdate) { 'Running au_BeforeUpdate' | result; au_BeforeUpdate | result }
+    if (Test-Path Function:\au_BeforeUpdate) { 'Running au_BeforeUpdate', (au_BeforeUpdate) | result }
 
     '  $Latest data:'
     $global:Latest.keys | sort | % {
@@ -292,7 +265,7 @@ function Update-Package {
 
     'Updating files' | result
     $package.UpdateFiles( $true ) | result
-    if (Test-Path Function:\au_AfterUpdate) { 'Running au_AfterUpdate' | result; au_AfterUpdate | result }
+    if (Test-Path Function:\au_AfterUpdate) { 'Running au_AfterUpdate', (au_AfterUpdate) | result }
 
     choco pack --limit-output | result
     if ($LastExitCode -ne 0) { throw "Choco pack failed with exit code $LastExitCode" }
