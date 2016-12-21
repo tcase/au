@@ -256,20 +256,6 @@ function Update-Package {
         }
     }
 
-    function is_updated() {
-        $remote_l = $package.RemoteVersion -replace '-.+'
-        $nuspec_l = $package.NuspecVersion -replace '-.+'
-        $remote_r = $package.RemoteVersion.Replace($remote_l,'')
-        $nuspec_r = $package.NuspecVersion.Replace($nuspec_l,'')
-
-        if ([version]$remote_l -eq [version] $nuspec_l) {
-            if (!$remote_r -and $nuspec_r) { return $true }
-            if ($remote_r -and !$nuspec_r) { return $false }
-            return ($remote_r -gt $nuspec_r)
-        }
-        [version]$remote_l -gt [version] $nuspec_l
-    }
-
     function result() {
         if ($global:Silent) { return }
 
@@ -294,7 +280,7 @@ function Update-Package {
         }
     }
 
-    $package = [AUPackage]::new( $pwd )
+    $package = New-AuPackage
     if ($Result) { sv -Scope Global -Name $Result -Value $package }
 
     $global:Latest = @{PackageName = $package.Name}
@@ -329,7 +315,7 @@ function Update-Package {
     "nuspec version: " + $package.NuspecVersion | result
     "remote version: " + $package.RemoteVersion | result
 
-    if (is_updated) {
+    if ($package.IsUpdated()) {
         if (!($NoCheckChocoVersion -or $Force)) {
             $choco_url = "https://chocolatey.org/packages/{0}/{1}" -f $package.Name, $package.RemoteVersion
             try {

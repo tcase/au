@@ -30,6 +30,21 @@ class AUPackage {
         return $nu
     }
 
+    [bool] IsUpdated() {
+        $remote_l = $this.RemoteVersion -replace '-.+'
+        $nuspec_l = $this.NuspecVersion -replace '-.+'
+        $remote_r = $this.RemoteVersion.Replace($remote_l,'')
+        $nuspec_r = $this.NuspecVersion.Replace($nuspec_l,'')
+
+        if ([version]$remote_l -eq [version] $nuspec_l) {
+            if (!$remote_r -and $nuspec_r) { return $true }
+            if ($remote_r -and !$nuspec_r) { return $false }
+            return ($remote_r -gt $nuspec_r)
+        }
+        return ([version]$remote_l -gt [version] $nuspec_l)
+    }
+
+
     SaveNuspec(){
         $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
         [System.IO.File]::WriteAllText($this.NuspecPath, $this.NuspecXml.InnerXml, $Utf8NoBomEncoding)
