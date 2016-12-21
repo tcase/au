@@ -73,4 +73,48 @@ class AUPackage {
         $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
         [System.IO.File]::WriteAllText($this.NuspecPath, $this.NuspecXml.InnerXml, $Utf8NoBomEncoding)
     }
+
+    UpdateFiles([bool]$DoMandatoryUpdates) {
+        function update_mandatory() {
+            if (!$DoMandatoryUpdates) { return }
+
+            "  $(Split-Path $this.NuspecPath -Leaf)"
+
+            "    setting id:  $($this.PackageName)"
+            $this.NuspecXml.package.metadata.id = $this.Name
+
+            $msg ="updating version: {0} -> {1}" -f $this.NuspecVersion, $this.RemoteVersion
+            if ($this.Forced) {
+                if ($this.RemoteVersion -eq $this.NuspecVersion) {
+                    $msg = "    version not changed as it already uses 'revision': {0}" -f $this.NuspecVersion
+                } else {
+                    $msg = "    using Chocolatey fix notation: {0} -> {1}" -f $this.NuspecVersion, $this.RemoteVersion
+                }
+            }
+            $msg
+
+            $this.NuspecXml.package.metadata.version = $this.RemoteVersion
+            $this.SaveNuspec()
+        }
+
+        function update_files() {
+            $sr = au_SearchReplace
+            $sr.Keys | % {
+                $fileName = $_
+                "  $fileName"
+
+                $fileContent = gc $fileName
+                $sr[ $fileName ].GetEnumerator() | % {
+                    '    {0} = {1} ' -f $_.name, $_.value
+                    if (!($fileContent -match $_.name)) { throw "Search pattern not found: '$($_.name)'" }
+                    $fileContent = $fileContent -replace $_.name, $_.value
+                }
+
+                $fileContent | Out-File -Encoding UTF8 $fileName
+            }
+        }
+
+        update_mandatory
+        update_files
+    }
 }

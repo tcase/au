@@ -175,64 +175,19 @@ function Update-Package {
         # This will set the new URLs before the files are downloaded but will replace checksums to empty ones so download will not fail
         #  because checksums are at that moment set for the previous version.
         # SkipNuspecFile is passed so that if things fail here, nuspec file isn't updated; otherwise, on next run
-        #  AU will think that package is the most recent. 
+        #  AU will think that package is the most recent.
         #
-        # TODO: This will also leaves other then nuspec files updated which is undesired side effect (should be very rare)
+        # TODO: If fails, it will also leave other then nuspec files updated which is undesired side effect (not very important)
         #
-        $global:Silent = $true
 
         $c32 = $global:Latest.Checksum32; $c64 = $global:Latest.Checksum64          #https://github.com/majkinetor/au/issues/36
         $global:Latest.Remove('Checksum32'); $global:Latest.Remove('Checksum64')    #  -||-
-        update_files -SkipNuspecFile | out-null
+        $package.UpdateFiles( $false )
         if ($c32) {$global:Latest.Checksum32 = $c32}
         if ($c64) {$global:Latest.Checksum64 = $c64}                                #https://github.com/majkinetor/au/issues/36
 
-        $global:Silent = $false
-
         # Invoke installer for each architecture to download files
         invoke_installer
-    }
-
-
-    function update_files( [switch]$SkipNuspecFile )
-    {
-        'Updating files' | result
-        '  $Latest data:' | result;  ($global:Latest.keys | sort | % { "    {0,-15} ({1})    {2}" -f $_, $global:Latest[$_].GetType().Name, $global:Latest[$_] }) | result; '' | result
-
-        if (!$SkipNuspecFile) {
-            "  $(Split-Path $package.NuspecPath -Leaf)" | result
-
-            "    setting id:  $($global:Latest.PackageName)" | result
-            $package.NuspecXml.package.metadata.id = $package.Name = $global:Latest.PackageName.ToString()
-
-            $msg ="updating version: {0} -> {1}" -f $package.NuspecVersion, $package.RemoteVersion
-            if ($script:is_forced) {
-                if ($package.RemoteVersion -eq $package.NuspecVersion) {
-                    $msg = "    version not changed as it already uses 'revision': {0}" -f $package.NuspecVersion
-                } else {
-                    $msg = "    using Chocolatey fix notation: {0} -> {1}" -f $package.NuspecVersion, $package.RemoteVersion
-                }
-            }
-            $msg | result
-
-            $package.NuspecXml.package.metadata.version = $package.RemoteVersion.ToString()
-            $package.SaveNuspec()
-        }
-
-        $sr = au_SearchReplace
-        $sr.Keys | % {
-            $fileName = $_
-            "  $fileName" | result
-
-            $fileContent = gc $fileName
-            $sr[ $fileName ].GetEnumerator() | % {
-                ('    {0} = {1} ' -f $_.name, $_.value) | result
-                if (!($fileContent -match $_.name)) { throw "Search pattern not found: '$($_.name)'" }
-                $fileContent = $fileContent -replace $_.name, $_.value
-            }
-
-            $fileContent | Out-File -Encoding UTF8 $fileName
-        }
     }
 
     function result() {
@@ -287,6 +242,7 @@ function Update-Package {
 
     if (![AUPackage]::IsVersion($Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
     $package.RemoteVersion = $Latest.Version
+    $package.Name          = $Latest.PackageName
 
     if (!$NoCheckUrl) { check_urls }
 
@@ -326,8 +282,16 @@ function Update-Package {
 
     if ($ChecksumFor -ne 'none') { get_checksum } else { 'Automatic checksum skipped' | result }
 
+    # Update files
     if (Test-Path Function:\au_BeforeUpdate) { 'Running au_BeforeUpdate' | result; au_BeforeUpdate | result }
-    update_files
+
+    '  $Latest data:'
+    $global:Latest.keys | sort | % {
+        "    {0,-15} ({1})    {2}" -f $_, $global:Latest[$_].GetType().Name, $global:Latest[$_]
+    }; '' | result
+
+    'Updating files' | result
+    $package.UpdateFiles( $true ) | result
     if (Test-Path Function:\au_AfterUpdate) { 'Running au_AfterUpdate' | result; au_AfterUpdate | result }
 
     choco pack --limit-output | result
