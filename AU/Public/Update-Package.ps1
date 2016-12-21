@@ -1,5 +1,5 @@
 # Author: Miodrag Milic <miodrag.milic@gmail.com>
-# Last Change: 19-Dec-2016.
+# Last Change: 21-Dec-2016.
 
 <#
 .SYNOPSIS
@@ -87,6 +87,11 @@ function Update-Package {
 
         #Do not show any Write-Host output.
         [switch] $NoHostOutput,
+
+        #Array, of options:
+        # - First element is path to the package which provides metadata that can end with !
+        # - All other fields represent metadata to include (no !) or exclude (with !).
+        [string[]] $UseMetadataFrom,
 
         #Output variable.
         [string] $Result
