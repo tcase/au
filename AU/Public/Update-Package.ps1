@@ -193,27 +193,6 @@ function Update-Package {
         invoke_installer
     }
 
-    function set_fix_version() {
-        $script:is_forced = $true
-
-        if ($global:au_Version) {
-            "Overriding version to: $global:au_Version" | result
-            $global:Latest.Version = $package.RemoteVersion = $global:au_Version
-            if (!(is_version $Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
-            $global:au_Version = $null
-            return
-        }
-
-        $date_format = 'yyyyMMdd'
-        $d = (get-date).ToString($date_format)
-        $v = [version]($package.NuspecVersion -replace '-.+')
-        $rev = $v.Revision.ToString()
-        try { $revdate = [DateTime]::ParseExact($rev, $date_format,[System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None) } catch {}
-        if (($rev -ne -1) -and !$revdate) { return }
-
-        $build = if ($v.Build -eq -1) {0} else {$v.Build}
-        $Latest.Version = $package.RemoteVersion = '{0}.{1}.{2}.{3}' -f $v.Major, $v.Minor, $build, $d
-    }
 
     function update_files( [switch]$SkipNuspecFile )
     {
@@ -283,9 +262,8 @@ function Update-Package {
     $package = New-AuPackage
     if ($Result) { sv -Scope Global -Name $Result -Value $package }
 
-    $global:Latest = @{PackageName = $package.Name}
-    $global:Latest.NuspecVersion = $package.NuspecVersion
-    if (!(is_version $package.NuspecVersion)) {
+    $global:Latest = @{PackageName = $package.Name; NuspecVersion = $package.NuspecVersion }
+    if (![AUPackage]::IsVersion( $package.NuspecVersion )) {
         Write-Warning "Invalid nuspec file Version '$($package.NuspecVersion)' - using 0.0"
         $global:Latest.NuspecVersion = $package.NuspecVersion = '0.0'
     }
@@ -307,7 +285,7 @@ function Update-Package {
         throw "au_GetLatest failed`n$_"
     }
 
-    if (!(is_version $Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
+    if (![AUPackage]::IsVersion($Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
     $package.RemoteVersion = $Latest.Version
 
     if (!$NoCheckUrl) { check_urls }
@@ -329,7 +307,16 @@ function Update-Package {
             'No new version found' | result
             return $package
         }
-        else { 'No new version found, but update is forced' | result; set_fix_version }
+        else {
+            'No new version found, but update is forced' | result
+            $package.SetForced()
+            if ($global:au_Version) {
+                "Overriding version to: $global:au_Version" | result
+                $global:Latest.Version = $package.RemoteVersion = $global:au_Version
+                if (![AUPackage]::IsVersion($Latest.Version)) { throw "Invalid version: $($Latest.Version)" }
+                $global:au_Version = $null
+            }
+        }
     }
 
     'New version is available' | result

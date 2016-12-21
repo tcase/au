@@ -3,6 +3,7 @@ class AUPackage {
     [string]   $Name
     [bool]     $Updated
     [bool]     $Pushed
+    [bool]     $Forced
     [string]   $RemoteVersion
     [string]   $NuspecVersion
     [string[]] $Result
@@ -30,6 +31,14 @@ class AUPackage {
         return $nu
     }
 
+    static [bool] IsVersion( [string] $Version ) {
+        $re = '^(\d{1,16})\.(\d{1,16})\.*(\d{1,16})*\.*(\d{1,16})*(-[^.-]+)*$'
+        if ($Version -notmatch $re) { return $false }
+
+        $v = $Version -replace '-.+'
+        return [version]::TryParse($v, [ref]($_))
+    }
+
     [bool] IsUpdated() {
         $remote_l = $this.RemoteVersion -replace '-.+'
         $nuspec_l = $this.NuspecVersion -replace '-.+'
@@ -44,6 +53,21 @@ class AUPackage {
         return ([version]$remote_l -gt [version] $nuspec_l)
     }
 
+    SetForced() {
+        $this.Forced = $true
+
+        $date_format = 'yyyyMMdd'
+        $d = (get-date).ToString($date_format)
+        $v = [version]($this.NuspecVersion -replace '-.+')
+        $rev = $v.Revision.ToString()
+
+        $revdate = $null
+        try { $revdate = [DateTime]::ParseExact($rev, $date_format, [CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None) } catch {}
+        if (($rev -ne -1) -and !$revdate) { return }
+
+        $build = if ($v.Build -eq -1) {0} else {$v.Build}
+        $this.RemoteVersion = '{0}.{1}.{2}.{3}' -f $v.Major, $v.Minor, $build, $d
+    }
 
     SaveNuspec(){
         $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
