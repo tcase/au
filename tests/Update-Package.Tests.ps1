@@ -159,7 +159,8 @@ Describe 'Update-Package' -Tag update {
                 { update -NoCheckUrl:$false } | Should Throw "Bad content type"
             }
 
-            It 'quits if updated package version already exist in Chocolatey community feed' {
+            It 'quits if updated package version already exists in Chocolatey community feed' {
+                Mock request {}
                 $res = update -NoCheckChocoVersion:$false
                 $res.Result[-1] | Should Match "New version is available but it already exists in the Chocolatey community feed"
             }

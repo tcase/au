@@ -159,7 +159,7 @@ class AUPackage {
         update_files
     }
 
-    SetFileType() {
+    SetLatestFileType() {
         $match_url = ($global:Latest.Keys | ? { $_ -match '^URL*' } | select -First 1 | % { $global:Latest[$_] } | split-Path -Leaf) -match '(?<=\.)[^.]+$'
         if ($match_url -and !$global:Latest.FileType) { $global:Latest.FileType = $Matches[0] }
     }

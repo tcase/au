@@ -235,7 +235,7 @@ function Update-Package {
     }
 
     if (!$NoCheckChocoVersion -and $package.ExistsInGallery( $global:Latest.Version )) {
-        "New version is available but it already exists in the Chocolatey community feed (disable using `$NoCheckChocoVersion`)." | result
+        "New version is available but it already exists in the Chocolatey community feed (disable using `$NoCheckChocoVersion`)" | result
         return $package
     }
 
@@ -252,7 +252,7 @@ function Update-Package {
 
     'New version is available' | result
 
-    $package.SetFileType()
+    $package.SetLatestFileType()
     if ($ChecksumFor -ne 'none') { get_checksum } else { 'Automatic checksum skipped' | result }
 
     # Update files
