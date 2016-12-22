@@ -20,15 +20,8 @@ class AUPackage {
         $this.NuspecPath = '{0}\{1}.nuspec' -f $this.Path, $this.Name
         if (!(gi $this.NuspecPath -ea ignore)) { throw 'No nuspec file found in the package directory' }
 
-        $this.NuspecXml     = [AUPackage]::LoadNuspecFile( $this.NuspecPath )
+        $this.NuspecXml     = $this.LoadNuspecFile()
         $this.NuspecVersion = $this.NuspecXml.package.metadata.version
-    }
-
-    static [xml] LoadNuspecFile( $NuspecPath ) {
-        $nu = New-Object xml
-        $nu.PSBase.PreserveWhitespace = $true
-        $nu.Load($NuspecPath)
-        return $nu
     }
 
     static [bool] IsVersion( [string] $Version ) {
@@ -39,7 +32,13 @@ class AUPackage {
         return [version]::TryParse($v, [ref]($_))
     }
 
-    [bool] IsUpdated() {
+    SaveNuspecFile(){
+        $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
+        [System.IO.File]::WriteAllText($this.NuspecPath, $this.NuspecXml.InnerXml, $Utf8NoBomEncoding)
+    }
+
+
+    [bool] UpdateAvailable() {
         $remote_l = $this.RemoteVersion -replace '-.+'
         $nuspec_l = $this.NuspecVersion -replace '-.+'
         $remote_r = $this.RemoteVersion.Replace($remote_l,'')
@@ -54,7 +53,7 @@ class AUPackage {
     }
 
     SetForced() {
-        if ($this.IsUpdated()) {
+        if ($this.UpdateAvailable()) {
             'Ignoring force as new remote version is available'
             return
         }
@@ -72,11 +71,6 @@ class AUPackage {
 
         $build = if ($v.Build -eq -1) {0} else {$v.Build}
         $this.RemoteVersion = '{0}.{1}.{2}.{3}' -f $v.Major, $v.Minor, $build, $d
-    }
-
-    SaveNuspec(){
-        $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
-        [System.IO.File]::WriteAllText($this.NuspecPath, $this.NuspecXml.InnerXml, $Utf8NoBomEncoding)
     }
 
     GetLatest() {
@@ -115,7 +109,22 @@ class AUPackage {
         return $false
     }
 
-    UpdateFiles([bool]$DoMandatoryUpdates) {
+    Update() {
+        $this.SetLatestFileType()
+        $this.ShowLatestData()
+
+        'Updating files'
+        if (Test-Path Function:\au_BeforeUpdate) { 'Running au_BeforeUpdate'; au_BeforeUpdate }
+        $this.UpdateFiles( $true )
+        if (Test-Path Function:\au_AfterUpdate)  { 'Running au_AfterUpdate';  au_AfterUpdate  }
+
+        $this.Updated = $true
+    }
+
+
+    # ======================================  HIDDEN  =========================================
+
+    hidden UpdateFiles([bool]$DoMandatoryUpdates) {
         function update_mandatory() {
             if (!$DoMandatoryUpdates) { return }
 
@@ -135,7 +144,7 @@ class AUPackage {
             $msg
 
             $this.NuspecXml.package.metadata.version = $this.RemoteVersion
-            $this.SaveNuspec()
+            $this.SaveNuspecFile()
         }
 
         function update_files() {
@@ -159,8 +168,29 @@ class AUPackage {
         update_files
     }
 
-    SetLatestFileType() {
+    hidden ShowLatestData() {
+        '  $Latest data:'
+        $global:Latest.keys | sort | % { "    {0,-15} ({1})    {2}" -f $_, $global:Latest[$_].GetType().Name, $global:Latest[$_] }
+    }
+
+    hidden SetLatestFileType() {
         $match_url = ($global:Latest.Keys | ? { $_ -match '^URL*' } | select -First 1 | % { $global:Latest[$_] } | split-Path -Leaf) -match '(?<=\.)[^.]+$'
         if ($match_url -and !$global:Latest.FileType) { $global:Latest.FileType = $Matches[0] }
     }
+
+    hidden [xml] LoadNuspecFile() {
+        $nu = New-Object xml
+        $nu.PSBase.PreserveWhitespace = $true
+        $nu.Load($this.NuspecPath)
+        return $nu
+    }
+
+    hidden CheckLatestUrls() {
+        "URL check"
+        $global:Latest.Keys | ? {$_ -like 'url*' } | % {
+            $url = $global:Latest[ $_ ]
+            if ($res = check_url $url) { throw "${res}:$url" } else { "  $url" }
+        }
+    }
+
 }
