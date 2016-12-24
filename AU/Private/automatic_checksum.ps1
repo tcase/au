@@ -17,7 +17,7 @@ function automatic_checksum([AUPackage]$Package, [string]$ChecksumFor)
             $Env:chocolateyForceX86 = if ($a -eq '32') { 'true' } else { '' }
             try {
                 #rm -force -recurse -ea ignore $pkg_path
-                .\tools\chocolateyInstall.ps1 | result
+                .\tools\chocolateyInstall.ps1
             } catch {
                 if ( "$_" -notlike 'au_break: *') { throw $_ } else {
                     $filePath = "$_" -replace 'au_break: '
@@ -83,5 +83,3 @@ function automatic_checksum([AUPackage]$Package, [string]$ChecksumFor)
     # Invoke installer for each architecture to download files
     invoke_installer
 }
-
-

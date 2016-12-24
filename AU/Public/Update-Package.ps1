@@ -1,5 +1,5 @@
 # Author: Miodrag Milic <miodrag.milic@gmail.com>
-# Last Change: 22-Dec-2016.
+# Last Change: 23-Dec-2016.
 
 <#
 .SYNOPSIS
@@ -98,7 +98,7 @@ function Update-Package {
     )
 
     function result() {
-        $input | % {
+        process {
             $package.Result += $_
             if (!$NoHostOutput) { Write-Host $_ }
         }
@@ -127,21 +127,21 @@ function Update-Package {
 
     if ($Result) { sv -Scope Global -Name $Result -Value $package }
 
-    $package.GetLatest()
+    $package.GetLatest() *>&1 | result
     if ($global:au_Force) { $Force = $true }  #au_GetLatest can also force update
 
     if (!$NoCheckUrl) { $package.CheckLatestUrls() }
 
     "nuspec version: " + $package.NuspecVersion | result
     "remote version: " + $package.RemoteVersion | result
-    if ($Force) { $package.SetForced() | result }
+    if ($Force) { $package.SetForced() 6>&1 | result }
 
     if (!$package.UpdateAvailable()) {
         'No new version found' | result
         return $package
     }
 
-    if (!$NoCheckChocoVersion -and $package.ExistsInGallery( $global:Latest.Version )) {
+    if (!$Force -and !$NoCheckChocoVersion -and $package.ExistsInGallery( $global:Latest.Version )) {
         "New version is available but it already exists in the Chocolatey community feed (disable using `$NoCheckChocoVersion`)" | result
         return $package
     }
@@ -160,7 +160,7 @@ function Update-Package {
     . {
         'New version is available'
         automatic_checksum $package $ChecksumFor
-        $package.Update()
+        $package.Update() 6>&1
         choco pack --limit-output
         if ($LastExitCode -ne 0) { throw "Choco pack failed with exit code $LastExitCode" }
         'Package updated'

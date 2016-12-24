@@ -37,8 +37,9 @@ class AUPackage {
         [System.IO.File]::WriteAllText($this.NuspecPath, $this.NuspecXml.InnerXml, $Utf8NoBomEncoding)
     }
 
-
     [bool] UpdateAvailable() {
+        if ($this.Forced) { return $true }
+
         $remote_l = $this.RemoteVersion -replace '-.+'
         $nuspec_l = $this.NuspecVersion -replace '-.+'
         $remote_r = $this.RemoteVersion.Replace($remote_l,'')
@@ -54,7 +55,7 @@ class AUPackage {
 
     SetForced() {
         if ($this.UpdateAvailable()) {
-            'Ignoring force as new remote version is available'
+            Write-Host 'Ignoring force as new remote version is available'
             return
         }
 
@@ -113,10 +114,10 @@ class AUPackage {
         $this.SetLatestFileType()
         $this.ShowLatestData()
 
-        'Updating files'
-        if (Test-Path Function:\au_BeforeUpdate) { 'Running au_BeforeUpdate'; au_BeforeUpdate }
+        Write-Host 'Updating files'
+        if (Test-Path Function:\au_BeforeUpdate) { Write-Host 'Running au_BeforeUpdate'; au_BeforeUpdate }
         $this.UpdateFiles( $true )
-        if (Test-Path Function:\au_AfterUpdate)  { 'Running au_AfterUpdate';  au_AfterUpdate  }
+        if (Test-Path Function:\au_AfterUpdate)  { Write-Host 'Running au_AfterUpdate';  au_AfterUpdate  }
 
         $this.Updated = $true
     }
@@ -128,9 +129,9 @@ class AUPackage {
         function update_mandatory() {
             if (!$DoMandatoryUpdates) { return }
 
-            "  $(Split-Path $this.NuspecPath -Leaf)"
+            Write-Host "  $(Split-Path $this.NuspecPath -Leaf)"
 
-            "    setting id:  $($this.PackageName)"
+            Write-Host "    setting id:  $($this.PackageName)"
             $this.NuspecXml.package.metadata.id = $this.Name
 
             $msg ="updating version: {0} -> {1}" -f $this.NuspecVersion, $this.RemoteVersion
@@ -141,7 +142,7 @@ class AUPackage {
                     $msg = "    using Chocolatey fix notation: {0} -> {1}" -f $this.NuspecVersion, $this.RemoteVersion
                 }
             }
-            $msg
+            Write-Host $msg
 
             $this.NuspecXml.package.metadata.version = $this.RemoteVersion
             $this.SaveNuspecFile()
@@ -151,7 +152,7 @@ class AUPackage {
             $sr = au_SearchReplace
             $sr.Keys | % {
                 $fileName = $_
-                "  $fileName"
+                Write-Host "  $fileName"
 
                 $fileContent = gc $fileName
                 $sr[ $fileName ].GetEnumerator() | % {
@@ -169,8 +170,11 @@ class AUPackage {
     }
 
     hidden ShowLatestData() {
-        '  $Latest data:'
-        $global:Latest.keys | sort | % { "    {0,-15} ({1})    {2}" -f $_, $global:Latest[$_].GetType().Name, $global:Latest[$_] }
+        Write-Host '  $Latest data:'
+        $global:Latest.keys | sort | % {
+           $line = "    {0,-15} ({1})    {2}" -f $_, $global:Latest[$_].GetType().Name, $global:Latest[$_]
+           Write-Host $line
+        }
     }
 
     hidden SetLatestFileType() {
@@ -186,7 +190,7 @@ class AUPackage {
     }
 
     hidden CheckLatestUrls() {
-        "URL check"
+        Write-Host "URL check"
         $global:Latest.Keys | ? {$_ -like 'url*' } | % {
             $url = $global:Latest[ $_ ]
             if ($res = check_url $url) { throw "${res}:$url" } else { "  $url" }
