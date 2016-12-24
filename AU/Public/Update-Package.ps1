@@ -1,5 +1,5 @@
 # Author: Miodrag Milic <miodrag.milic@gmail.com>
-# Last Change: 23-Dec-2016.
+# Last Change: 24-Dec-2016.
 
 <#
 .SYNOPSIS
@@ -97,12 +97,7 @@ function Update-Package {
         [string] $Result
     )
 
-    function result() {
-        process {
-            $package.Result += $_
-            if (!$NoHostOutput) { Write-Host $_ }
-        }
-    }
+    function result() { process { $package.Result += $_; if (!$NoHostOutput) { Write-Host $_ } } }
 
     [System.Net.ServicePointManager]::SecurityProtocol = 'Ssl3,Tls,Tls11,Tls12' #https://github.com/chocolatey/chocolatey-coreteampackages/issues/366
     $module = $MyInvocation.MyCommand.ScriptBlock.Module
@@ -127,10 +122,10 @@ function Update-Package {
 
     if ($Result) { sv -Scope Global -Name $Result -Value $package }
 
-    $package.GetLatest() *>&1 | result
+    $package.GetLatest() 6>&1 | result
     if ($global:au_Force) { $Force = $true }  #au_GetLatest can also force update
 
-    if (!$NoCheckUrl) { $package.CheckLatestUrls() }
+    if (!$NoCheckUrl) { $package.CheckLatestUrls() 6>&1 | result  }
 
     "nuspec version: " + $package.NuspecVersion | result
     "remote version: " + $package.RemoteVersion | result

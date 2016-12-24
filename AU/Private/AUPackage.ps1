@@ -193,7 +193,7 @@ class AUPackage {
         Write-Host "URL check"
         $global:Latest.Keys | ? {$_ -like 'url*' } | % {
             $url = $global:Latest[ $_ ]
-            if ($res = check_url $url) { throw "${res}:$url" } else { "  $url" }
+            if ($res = check_url $url) { throw "${res}:$url" } else { Write-Host "  $url" }
         }
     }
 
