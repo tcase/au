@@ -52,7 +52,7 @@ $params = @{
 }
 if ($ApiKey) {
     $params.Headers = @{
-        Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($ApiKey))
+        Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$ApiKey"))
     }
 }
 $res = iwr @params
