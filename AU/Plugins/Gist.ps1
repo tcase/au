@@ -24,6 +24,9 @@ param(
 
     # Gist description
     [string] $Description = "Update-AUPackages Report #powershell #chocolatey"
+
+    # Gist api
+    [string] $Uri = 'https://api.github.com/gists'
 )
 
 # Create gist
@@ -40,11 +43,10 @@ ls $Path | % {
 }
 
 # request
-$uri  = 'https://api.github.com/gists'
 $params = @{
     ContentType = 'application/json'
     Method      = if ($Id) { "PATCH" } else { "POST" }
-    Uri         = if ($Id) { "$uri/$Id" } else { $uri }
+    Uri         = if ($Id) { "$Uri/$Id" } else { $Uri }
     Body        = $gist | ConvertTo-Json
     UseBasicparsing = $true
 }
