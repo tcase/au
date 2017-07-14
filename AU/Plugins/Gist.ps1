@@ -23,7 +23,7 @@ param(
     [string[]] $Path,
 
     # Gist description
-    [string] $Description = "Update-AUPackages Report #powershell #chocolatey"
+    [string] $Description = "Update-AUPackages Report #powershell #chocolatey",
 
     # Gist api
     [string] $Uri = 'https://api.github.com/gists'
@@ -52,7 +52,7 @@ $params = @{
 }
 if ($ApiKey) {
     $params.Headers = @{
-        Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$ApiKey"))
+        Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($ApiKey))
     }
 }
 $res = iwr @params
