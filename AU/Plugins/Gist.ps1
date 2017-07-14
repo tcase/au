@@ -64,5 +64,5 @@ if ($Uri -eq 'https://api.github.com/gists') {
     "https://gist.github.com/$id"
 }
 else {
-    ([Uri]$Uri).GetLeftPart("Authority") + "/$id"
+    ([Uri]$Uri).GetLeftPart("Authority") + "/gist/$id"
 }
