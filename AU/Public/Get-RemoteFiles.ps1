@@ -24,6 +24,9 @@ function Get-RemoteFiles {
         # Do not add arch suffix (_x32 or _64) at the end of the filename
         [switch] $NoSuffix,
 
+        # Use default credentials when configuring the webclient
+        [switch] $UseDefaultCredentials,
+
         # Override remote file name, use this one as a base. Suffixes _x32/_x64 are added.
         # Use this parameter if remote URL doesn't contain file name but generated hash.
         [string] $FileNameBase,
@@ -63,6 +66,8 @@ function Get-RemoteFiles {
 
     try {
         $client = New-Object System.Net.WebClient
+
+        $client.UseDefaultCredentials = $UseDefaultCredentials
 
         if ($Latest.Url32) {
             $base_name = name4url $Latest.Url32
