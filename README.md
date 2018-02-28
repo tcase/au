@@ -12,13 +12,17 @@ To see AU in action see [video tutorial](https://www.youtube.com/watch?v=m2XpV2L
 ## Features
 
 - Use only PowerShell to create automatic update script for given package.
+- Handles multiple streams with a single update script.
 - Automatically downloads installers and provides/verifies checksums for x32 and x64 versions.
 - Verifies URLs, nuspec versions, remote repository existence etc.
-- Can use global variables to change functionality.
-- Sugar functions for Chocolatey package maintainers.
+- Automatically sets the Nuspec descriptions from a README.md files.
 - Update single package or any subset of previously created AU packages with a single command.
 - Multithread support when updating multiple packages.
+- Repeat or ignore specific failures when updating multiple packages. 
 - Plugin system when updating everything, with few integrated plugins to send email notifications, save results to gist and push updated packages to git repository.
+- Use of global variables to change functionality.
+- Sugar functions for Chocolatey package maintainers.
+- Great performance - hundreeds of packages can be checked and updated in several minutes.
 
 
 ## Installation
@@ -49,7 +53,7 @@ As an example, the following function uses [Invoke-WebRequest](https://technet.m
 
 ```powershell
 function global:au_GetLatest {
-     $download_page = Invoke-WebRequest -Uri $releases #1 
+     $download_page = Invoke-WebRequest -Uri $releases -UseBasicParsing #1
      $regex   = '.exe$'
      $url     = $download_page.links | ? href -match $regex | select -First 1 -expand href #2
      $version = $url -split '-|.exe' | select -Last 1 -Skip 2 #3
@@ -58,7 +62,6 @@ function global:au_GetLatest {
 ```
 
 The returned version is later compared to the one in the nuspec file and if remote version is higher, the files will be updated. The returned keys of this HashTable are available via global variable `$global:Latest` (along with some keys that AU generates). You can put whatever data you need in the returned HashTable - this data can be used later in `au_SearchReplace`.
-
 
 ### `au_SearchReplace`  
 
@@ -137,6 +140,33 @@ Package updated
 
 This is best understood via the example - take a look at the real life package [installer script](https://github.com/majkinetor/au-packages/blob/master/dngrep/tools/chocolateyInstall.ps1) and its [AU updater](https://github.com/majkinetor/au-packages/blob/master/dngrep/update.ps1).
 
+### Automatic package description from README.md
+
+If a package directory contains the `README.md` file, its content will be automatically set as description of the package with first 2 lines omitted - you can put on those lines custom content that will not be visible in the package description. 
+
+To disable this option use `-NoReadme` switch with the `Update-Package` function. You can still call it manually from within `au_AfterUpdate`, which you may want to do in order to pass custom parameters to it:
+
+```powershell
+function global:au_AfterUpdate ($Package)  {
+     Set-DescriptionFromReadme $Package -SkipLast 2 -SkipFirst 5
+}
+```
+
+To extract descriptions from existing packages into README.md files the following script can be used:
+
+```powershell
+ls | ? PSIsContainer | ? { !(Test-Path $_\README.md) } | % {
+  [xml] $package = gc $_\*.nuspec -ea 0 -Encoding UTF8
+  if (!$package) { return }
+
+  $meta = $package.package.metadata
+  $readme = ('# <img src="{1}" width="48" height="48"/> [{0}](https://chocolatey.org/packages/{0})' -f $meta.id, $meta.iconUrl), ''
+  $readme += $meta.description -split "`n" | % { $_.Trim() }
+  $readme -join "`n" | Out-File -Encoding UTF8 $_\README.md
+  $meta.id
+}
+```
+
 ### Checks
 
 The `update` function does the following checks:
@@ -187,7 +217,7 @@ Sometimes invoking `chocolateyInstall.ps1` during the automatic checksum could b
   }
 
   function au_GetLatest() {
-    download_page = Invoke-WebRequest $releases -UseBasicParsing
+    $download_page = Invoke-WebRequest $releases -UseBasicParsing
     $url     = $download_page.links | ? href -match '\.exe$' | select -First 1 -expand href
     $version = $url -split '/' | select -Last 1 -Skip 1
     @{
@@ -279,6 +309,46 @@ function au_BeforeUpdate() {
 This function will also set the appropriate `$Latest.ChecksumXX`. 
 
 **NOTE**: There is no need to use automatic checksum when embedding because `Get-RemoteFiles` will do it, so always use parameter `-ChecksumFor none`. 
+
+### Streams
+
+The software vendor may maintain _multiple latest versions_, of specific releases because of the need for long time support. `au_GetLatest` provides an option to return multiple HashTables in order for its user to monitor each supported software _stream_. Prior to AU streams, each software stream was typically treated as a separate package and maintained independently. Using AU streams allows a single package updater to update multiple version streams in a single run:
+
+```powershell
+function global:au_GetLatest {
+    # ...
+    @{
+        Streams = [ordered] @{
+            '1.3' = @{ Version = $version13; URL32 = $url13 }  # $version13 = '1.3.9'
+            '1.2' = @{ Version = $version12; URL32 = $url12 }  # $version12 = '1.2.3.1'
+        }
+    }
+}
+```
+
+Though a `Hashtable` can be returned for streams, it is recommended to return an `OrderedDictionary` (see above example) that contains streams from the most recent to the oldest one. This ensures that when forcing an update, the most recent stream available will be considered by default (i.e. when no `-IncludeStream` is specified).
+
+Latest stream versions are kept in the `<package_name>.json` file in the package directory. For real life example take a look at the [Python3](https://github.com/chocolatey/chocolatey-coreteampackages/blob/master/automatic/python3/update.ps1) package updater which automatically finds available python 3 streams and keeps them [up to date](https://gist.github.com/a14b1e5bfaf70839b338eb1ab7f8226f/78cdc99c2d7433d26c65bc721c26c1cc60ccca3d#python3).
+
+Streams can be also used to manage multiple related packages as a single package. [LibreOffice](https://github.com/chocolatey/chocolatey-coreteampackages/blob/master/automatic/libreoffice/update.ps1) package updater uses streams to manage [two different](https://gist.github.com/choco-bot/a14b1e5bfaf70839b338eb1ab7f8226f/78cdc99c2d7433d26c65bc721c26c1cc60ccca3d#libreoffice) variants of the software (prior to streams this was handled via 2 packages.)
+
+In order to help working with versions, function `Get-Version` can be called in order to parse [semver](http://semver.org/) versions in a flexible manner. It returns an `AUVersion` object with all the details about the version. Furthermore, this object can be compared and sorted.
+
+**NOTES**: 
+- By default only the first updated stream is pushed per run of `updateall`. In order to push all of them add among its options `PushAll = $true`.
+- To force the update of the single stream using `IncludeStream` parameter. To do so on via commit message use `[AU package\stream]` syntax.
+
+```powershell
+PS> Get-Version 'v1.3.2.7rc1'
+
+Version Prerelease BuildMetadata
+------- ---------- -------------
+1.3.2.7 rc1
+
+PS> $version = Get-Version '1.3.2-beta2+5'
+PS> $version.ToString(2) + ' => ' + $version.ToString()
+1.3 => 1.3.2-beta2+5
+```
 
 ### WhatIf
 
@@ -459,3 +529,10 @@ Push the latest package using your API key.
 
 - Get-AuPackages (alias `gau` or `lsau`)  
 Returns the list of the packages which have `update.ps1` script in its directory and which name doesn't start with '_'.
+
+## Community
+
+- [Wormies AU Helpers](https://github.com/WormieCorp/Wormies-AU-Helpers)  
+Helper scripts to make maintaining packages using AU even easier
+- [Chocolatey Core Community Maintainers Team Packages](https://github.com/chocolatey/chocolatey-coreteampackages)  
+The [largest](https://gist.github.com/choco-bot/a14b1e5bfaf70839b338eb1ab7f8226f) repository of AU packages by far

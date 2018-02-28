@@ -47,6 +47,7 @@ function Update-AUPackages {
           UpdateTimeout     - Timeout for background job in seconds, by default 1200 (20 minutes).
           Force             - Force package update even if no new version is found.
           Push              - Set to true to push updated packages to Chocolatey community repository.
+          PushAll           - Set to true to push all updated packages and not only the most recent one per folder.
           WhatIf            - Set to true to set WhatIf option for all packages.
           PluginPath        - Additional path to look for user plugins. If not set only module integrated plugins will work
 
@@ -124,22 +125,25 @@ function Update-AUPackages {
                         $pkg.Ignored = $true
                         $pkg.IgnoreMessage = $pkg.Result[-1]
                     } elseif ($job.State -eq 'Stopped') {
-                        $pkg.Error = "Job termintated due to the $($Options.UpdateTimeout)s UpdateTimeout"
+                        $pkg.Error = "Job terminated due to the $($Options.UpdateTimeout)s UpdateTimeout"
                     } else {
                         $pkg.Error = 'Job returned no object, Vector smash ?'
                     }
+                } else {
+                    $pkg = [AUPackage]::new($pkg)
                 }
 
-
-                $message = $pkg.Name + ' '
+                $jobseconds = ($job.PSEndTime.TimeOfDay - $job.PSBeginTime.TimeOfDay).TotalSeconds
+                $message = "[$($p)/$($aup.length)] " + $pkg.Name + ' '
                 $message += if ($pkg.Updated) { 'is updated to ' + $pkg.RemoteVersion } else { 'has no updates' }
                 if ($pkg.Updated -and $Options.Push) {
                     $message += if (!$pkg.Pushed) { ' but push failed!' } else { ' and pushed'}
                 }
                 if ($pkg.Error) {
-                    $message = "$($pkg.Name) ERROR: "
+                    $message = "[$($p)/$($aup.length)] $($pkg.Name) ERROR: "
                     $message += $pkg.Error.ToString() -split "`n" | % { "`n" + ' '*5 + $_ }
                 }
+                $message+= " ({0:N2}s)" -f $jobseconds
                 Write-Host '  ' $message
 
                 $result += $pkg
@@ -214,7 +218,7 @@ function Update-AUPackages {
             if ( "$type" -ne 'AUPackage') { throw "'$using:package_name' update script didn't return AUPackage but: $type" }
 
             if ($pkg.Updated -and $Options.Push) {
-                $pkg.Result += $r = Push-Package
+                $pkg.Result += $r = Push-Package -All:$Options.PushAll
                 if ($LastExitCode -eq 0) {
                     $pkg.Pushed = $true
                 } else {
@@ -227,7 +231,7 @@ function Update-AUPackages {
                 . $s $using:package_name $Options
             }
 
-            $pkg
+            $pkg.Serialize()
         } | Out-Null
     }
     $result = $result | sort Name
