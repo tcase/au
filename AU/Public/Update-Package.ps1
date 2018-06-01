@@ -107,7 +107,7 @@ function Update-Package {
         "URL check" | result
         $Latest.Keys | ? {$_ -like 'url*' } | % {
             $url = $Latest[ $_ ]
-            if ($res = check_url $url) { throw "${res}:$url" } else { "  $url" | result }
+            if ($res = check_url $url -Options $Latest.Options) { throw "${res}:$url" } else { "  $url" | result }
         }
     }
 
@@ -223,7 +223,8 @@ function Update-Package {
         $script:is_forced = $false
         if ([AUVersion] $Latest.Version -gt [AUVersion] $Latest.NuspecVersion) {
             if (!($NoCheckChocoVersion -or $Force)) {
-                $choco_url = "https://chocolatey.org/packages/{0}/{1}" -f $global:Latest.PackageName, $package.RemoteVersion
+                if ( !$au_GalleryUrl ) { $au_GalleryUrl = 'https://chocolatey.org' } 
+                $choco_url = "$au_GalleryUrl/packages/{0}/{1}" -f $global:Latest.PackageName, $package.RemoteVersion
                 try {
                     request $choco_url $Timeout | out-null
                     "New version is available but it already exists in the Chocolatey community feed (disable using `$NoCheckChocoVersion`):`n  $choco_url" | result
@@ -433,7 +434,7 @@ function Update-Package {
         $res.Keys | ? { $_ -ne 'Streams' } | % { $global:au_Latest.Remove($_) }
         $global:au_Latest += $res
 
-        $allStreams = [ordered] @{}
+        $allStreams = [System.Collections.Specialized.OrderedDictionary] @{}
         $streams | % {
             $stream = $res.Streams[$_]
 

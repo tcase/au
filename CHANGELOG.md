@@ -1,5 +1,23 @@
 # AU Project Changelog
 
+## Next
+
+
+## 2018.5.18
+
+- `Update-Package`: 
+  - Now you can pass HTTP/HTTPS headers to `$Latest.Options.Headers` to avoid `Unauthorized` errors while checking URLs.
+  - Package Gallery URL is no longer hard-coded but taken from the `$au_GalleryUrl` if it exists ([#95](https://github.com/majkinetor/au/issues/95))
+- `Update-AUPackages`: Added `NoCheckChocoVersion` option.
+- Plugins:
+  - `Git`: Added `Branch` parameter to specify a branch name
+  - `Mail`: Added `From` parameter to be used with mail servers that do not allow non-existent email addresses.
+
+### Bugfixes
+
+- `Gist` plugin: Security protocol is set according to updated [Github requirements](https://githubengineering.com/crypto-removal-notice).
+- `Get-RemoteFiles`: Fixed wrong checksum type being set on 64bit url
+
 ## 2018.1.11
 - `Update-AuPackage`
   - New feature [streams](https://github.com/majkinetor/au#streams) that extends `au_GetLatest` with option to return multiple HashTables (one for each stream).
