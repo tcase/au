@@ -22,14 +22,14 @@ To see AU in action see [video tutorial](https://www.youtube.com/watch?v=m2XpV2L
 - Handles multiple streams with a single update script.
 - Automatically downloads installers and provides/verifies checksums for x32 and x64 versions.
 - Verifies URLs, nuspec versions, remote repository existence etc.
-- Automatically sets the Nuspec descriptions from a README.md files.
+- Automatically sets the nuspec descriptions from a README.md files.
 - Update single package or any subset of previously created AU packages with a single command.
 - Multithread support when updating multiple packages.
 - Repeat or ignore specific failures when updating multiple packages. 
 - Plugin system when updating everything, with few integrated plugins to send email notifications, save results to gist and push updated packages to git repository.
 - Use of global variables to change functionality.
 - Sugar functions for Chocolatey package maintainers.
-- Great performance - hundreeds of packages can be checked and updated in several minutes.
+- Great performance - hundreds of packages can be checked and updated in several minutes.
 
 
 ## Installation
@@ -254,7 +254,7 @@ Updating files
 ...
 ```
 
-Force option changes how package version is used. Without force, the `NuspecVersion` determines what is going on. Normally, if `NuspecVersion` is lower or equal then the `RemoteVersion` update happens. With `Force` this changes:
+Force option changes how package version is used. Without force, the `NuspecVersion` determines what is going on. Normally, if `NuspecVersion` is lower then the `RemoteVersion` update happens. With `Force` this changes:
 
 1. If `NuspecVersion` is lower then `RemoteVersion`, Force is ignored and update happens as it would normally
 2. If `NuspecVersion` is the same as the `RemoteVersion`, the version will change to chocolatey fix notation.
@@ -382,7 +382,7 @@ WARNING: Package restored and updates saved to: C:\Users\majkinetor\AppData\Loca
 
 You can update all packages and optionally push them to the Chocolatey repository with a single command. Function `Update-AUPackages` (alias `updateall`) will iterate over `update.ps1` scripts and execute each in a separate thread. If it detects that a package is updated it will optionally try to push it to the Chocolatey repository and may also run configured plugins.
 
-For the push to work, specify your Choocolatey API key in the file `api_key` in the script's directory (or its parent directory) or set the environment variable `$Env:api_key`. If none provided cached nuget key will be used.
+For the push to work, specify your Chocolatey API key in the file `api_key` in the script's directory (or its parent directory) or set the environment variable `$Env:api_key`. If none provided cached NuGet key will be used.
 
 The function will search for packages in the current directory. To override that, use global variable `$au_Root`:
 
@@ -490,7 +490,7 @@ Its preferable to run the updater on [AppVeyor](https://github.com/majkinetor/au
 
 ### Handling update errors
 
-When errors occur during the update, email will be sent to the owner and report will contain [errors](https://gist.github.com/gep13/bd2eaa76f2a9ab739ca0544c502dca6e/c71d4eb3f6de2848f41c1b92e221737d775f0b6f#errors) section. Some network errors are expectable and you may want to ignore them - package that failed will get updated in one of the subsequent runs anyway. To ignore an error, use try/catch block around update and return 'ignore' word from the `update.ps1` script:
+When errors occur during the `updateall` operation, email will be sent to the owner and report will contain [errors](https://gist.github.com/gep13/bd2eaa76f2a9ab739ca0544c502dca6e/c71d4eb3f6de2848f41c1b92e221737d775f0b6f#errors) section. Some network errors are expectable and you may want to ignore them - package that failed will get updated in one of the subsequent runs anyway. To ignore an error, use try/catch block around update and return 'ignore' word from the `update.ps1` script:
 
     try {
         update
@@ -502,7 +502,7 @@ When errors occur during the update, email will be sent to the owner and report 
 
 The package will get shown in the report as [ignored](https://gist.github.com/gep13/bd2eaa76f2a9ab739ca0544c502dca6e/db5313020d882945d8fcc3a10f5176263bb837a6#quicktime) and no errors will be shown.
 
-`au_GetLatest` can also return 'ignore' word instead of `$Latest` HashTable to force the package to be ignored in the `updateall` context.
+Keyword `'ignore'` can also be used inside `au_GetLatest` function: returning this keyword instead of `$Latest` HashTable or as a result for particular stream will ignore that package or particular package stream.
 
 If some errors occur in multiple packages, you can make `updateall` **repeat and/or ignore** such packages globally without any changes to `update.ps1` scripts. To do so, provide repeat/ignore options to its`$Options` HashTable parameter as in the following example:
 
@@ -534,11 +534,11 @@ Can't validate URL
 Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (401) Unauthorized.":<url>
 ```
 
-you need to pass HTTP/HTTPS headers used for retreiving `url`/`url64bit` to `$Latest.Options.Headers` as `Hashtable`, where key is header name, and value are header itself. This may be `Authorization` or `Referer` header or any others.
+you need to pass HTTP/HTTPS headers used for retrieving `url`/`url64bit` to `$Latest.Options.Headers` as `Hashtable`, where key is header name, and value are header itself. This may be `Authorization` or `Referer` header or any others.
 
 ## Other functions
 
-Apart from the functions used in the updating process, there are few suggars for regular maintenance of the package:
+Apart from the functions used in the updating process, there are few sugars for regular maintenance of the package:
 
 - Test-Package  
 Quickly test install and/or uninstall of the package from the current directory with optional parameters. This function can be used to start testing in [chocolatey-test-environment](https://github.com/majkinetor/chocolatey-test-environment) via `Vagrant` parameter.

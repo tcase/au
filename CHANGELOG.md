@@ -1,7 +1,17 @@
 # AU Project Changelog
 
-## Next
+## 2019.5.22
 
+- `Get-RemoteChecksum`: New parameter `Headers`
+- Plugins:
+  - New plugin: Gitter
+  - New plugin: Snippet
+
+### Bugfixes
+  
+- Fixed header handling during request ([#164](https://github.com/majkinetor/au/issues/164))
+- Push errors are not repeated or ignored on ([#175](https://github.com/majkinetor/au/issues/175))
+- Few small changes and fixes
 
 ## 2018.5.18
 
