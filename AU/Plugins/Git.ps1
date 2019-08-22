@@ -24,6 +24,10 @@ param(
 
     # Branch name
     [string]$Branch = 'master'
+	
+	# Remote Repo Host
+	[ValidateSet('github', 'gitlab')]
+	[string]$RemoteRepoHost = 'github'
 )
 
 [array]$packages = if ($Force) { $Info.result.updated } else { $Info.result.pushed }
@@ -34,18 +38,26 @@ pushd $root
 $origin  = git config --get remote.origin.url
 $origin -match '(?<=:/+)[^/]+' | Out-Null
 $machine = $Matches[0]
+# Adding regex to remove http headers from the machine name
+if ($machine -match '@(.+)') { $machine = $Matches[1] }
 
 if ($User -and $Password) {
     Write-Host "Setting credentials for: $machine"
 
-    if ( "machine $server" -notmatch (gc ~/_netrc)) {
+    if ( "machine $machine" -notmatch (gc ~/_netrc -erroraction 'silentlycontinue') ) {
         Write-Host "Credentials already found for machine: $machine"
     }
     "machine $machine", "login $User", "password $Password" | Out-File -Append ~/_netrc -Encoding ascii
 } elseif ($Password) {
     Write-Host "Setting oauth token for: $machine"
     git config --global credential.helper store
-    Add-Content "$env:USERPROFILE\.git-credentials" "https://${Password}:x-oauth-basic@$machine`n"
+	if ($RemoteRepoHost.ToLower() -eq 'github') {
+		Add-Content "$env:USERPROFILE\.git-credentials" "https://${Password}:x-oauth-basic@$machine`n"
+	}
+	elseif ($RemoteRepoHost.ToLower() -eq 'gitlab') {
+		Add-Content "$env:USERPROFILE\.git-credentials" "https://Private-Token:${Password}@$machine`n"
+	}
+	
 }
 
 Write-Host "Executing git pull"
