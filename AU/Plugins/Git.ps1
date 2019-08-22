@@ -23,7 +23,7 @@ param(
     [string]$commitStrategy = 'single',
 
     # Branch name
-    [string]$Branch = 'master'
+    [string]$Branch = 'master',
 	
 	# Remote Repo Host
 	[ValidateSet('github', 'gitlab')]
