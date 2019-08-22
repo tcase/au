@@ -55,7 +55,8 @@ if ($User -and $Password) {
 		Add-Content "$env:USERPROFILE\.git-credentials" "https://${Password}:x-oauth-basic@$machine`n"
 	}
 	elseif ($RemoteRepoHost.ToLower() -eq 'gitlab') {
-		Add-Content "$env:USERPROFILE\.git-credentials" "https://Private-Token:${Password}@$machine`n"
+		$newOrigin = $origin -replace "(https?://).*@(.*)","`$1Private-Token:$test`$2"
+		git config remote.origin.url $newOrigin
 	}
 	
 }
