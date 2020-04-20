@@ -66,6 +66,10 @@ function Get-RemoteFiles {
 
     try {
         $client = New-Object System.Net.WebClient
+        
+        if ($Latest.Options.Headers) {
+            $Latest.Options.Headers.GetEnumerator() | % { $client.Headers.Add($_.Key, $_.Value) | Out-Null }
+        }
 
         $client.UseDefaultCredentials = $UseDefaultCredentials
 
